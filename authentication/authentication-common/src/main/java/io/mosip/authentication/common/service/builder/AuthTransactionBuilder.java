@@ -105,8 +105,6 @@ public class AuthTransactionBuilder {
 
 	private Double amount;
 
-	private String biometricFailureReason;
-
 	/**
 	 * Set the AuthRequestDTO.
 	 *
@@ -235,11 +233,6 @@ public class AuthTransactionBuilder {
 		return amount;
 	}
 
-
-	public AuthTransactionBuilder withBiometricFailureReason(String reason) {
-		this.biometricFailureReason = reason;
-		return this;
-	}
 	/**
 	 * Build {@code AutnTxn}.
 	 *
@@ -304,9 +297,6 @@ public class AuthTransactionBuilder {
 						.map(RequestType::getMessage)
 						.collect(Collectors.joining(REQ_TYPE_MSG_DELIM));
 				String comment = isStatus ? requestTypeMessages + " Success" : requestTypeMessages + " Failed";
-				if (biometricFailureReason != null && !isStatus) {
-					comment = comment + " - " + biometricFailureReason;
-				}
 				autnTxn.setStatusComment(comment);
 			} else {
 				if(authTypeCode != null) {

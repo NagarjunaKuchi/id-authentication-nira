@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -394,12 +393,6 @@ public class AuthFacadeImpl implements AuthFacade {
 				statusInfo = bioValidationStatus;
 
 				boolean isStatus = statusInfo != null && statusInfo.isStatus();
-
-                if (!isStatus && AuthTransactionHelper.isFingerAuth(authRequestDTO, env)) {
-                    authTxnBuilder.withBiometricFailureReason(
-                            getBiometricFailureReason(statusInfo));
-                }
-
 				saveAndAuditBioAuthTxn(authRequestDTO, token, idType, isStatus, authTokenId, !isAuth, partnerId,
 						authTxnBuilder, idvidHash);
 			} finally {
@@ -409,26 +402,6 @@ public class AuthFacadeImpl implements AuthFacade {
 
 		}
 	}
-
-    private String getBiometricFailureReason(AuthStatusInfo statusInfo) {
-
-        if (statusInfo == null || statusInfo.getErr() == null || statusInfo.getErr().isEmpty()) {
-            return "Finger Authentication Failed - No error";
-        }
-
-        String errors = statusInfo.getErr().stream().filter(Objects::nonNull).map(error -> {
-            String code = error.getErrorCode();
-            String message = error.getErrorMessage();
-
-            if (code != null && message != null) {
-                return "[" + code + "] " + message;
-            }
-
-            return message != null ? message : code;
-        }).filter(Objects::nonNull).collect(Collectors.joining("; "));
-
-        return errors.isEmpty() ? "Finger Authentication Failed - No error" : "Finger Authentication Failed - " + errors;
-    }
 
 	/**
 	 * Process demo auth.
