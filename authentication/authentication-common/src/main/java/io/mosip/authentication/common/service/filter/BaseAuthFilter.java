@@ -92,9 +92,25 @@ public abstract class BaseAuthFilter extends BaseIDAFilter {
 			requestWrapper.resetInputStream();
 			Map<String, Object> decipherRequest = decipherRequest(requestBody);
 			decipherRequest = processDecipheredReqeuest(decipherRequest);
-			validateDecipheredRequest(requestWrapper, decipherRequest);
+			try {
+				validateDecipheredRequest(requestWrapper, decipherRequest);
+			} catch (IdAuthenticationAppException e) {
+				// The request is already decrypted here; keep it for the payload log
+				// (serialized lazily, so nothing happens when logging is disabled).
+				final Map<String, Object> decrypted = decipherRequest;
+				captureDecryptedRequest(requestWrapper, () -> {
+					try {
+						return mapper.writeValueAsString(decrypted);
+					} catch (IOException ioe) {
+						return null;
+					}
+				});
+				throw e;
+			}
 			String requestAsString = mapper.writeValueAsString(decipherRequest);
 			requestWrapper.replaceData(requestAsString.getBytes());
+			// Reuses the string built above: no extra serialization or decryption.
+			captureDecryptedRequest(requestWrapper, () -> requestAsString);
 		} catch (IOException e) {
 			mosipLogger.error(IdAuthCommonConstants.SESSION_ID, EVENT_FILTER, BASE_AUTH_FILTER, ExceptionUtils.getStackTrace(e));
 			throw new IdAuthenticationAppException(IdAuthenticationErrorConstants.UNABLE_TO_PROCESS);

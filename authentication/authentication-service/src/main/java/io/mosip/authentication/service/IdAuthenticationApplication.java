@@ -52,6 +52,7 @@ import io.mosip.authentication.common.service.integration.TokenIdManager;
 import io.mosip.authentication.common.service.transaction.manager.IdAuthSecurityManager;
 import io.mosip.authentication.common.service.util.BioMatcherUtil;
 import io.mosip.authentication.common.service.util.EnvUtil;
+import io.mosip.authentication.common.service.payloadlog.DecryptedPayloadLogService;
 import io.mosip.authentication.common.service.util.IdaRequestResponsConsumerUtil;
 import io.mosip.authentication.common.service.util.KeyBindedTokenMatcherUtil;
 import io.mosip.authentication.common.service.validator.AuthFiltersValidator;
@@ -119,6 +120,7 @@ import io.mosip.kernel.zkcryptoservice.service.impl.ZKCryptoManagerServiceImpl;
 		MasterDataUpdateEventInitializer.class, DemoNormalizer.class, DemoMatcherUtil.class,
 		IdAuthFraudAnalysisEventManager.class, IdAuthFraudAnalysisEventPublisher.class, AuthFiltersValidator.class,
 		AuthAnonymousProfileServiceImpl.class, AuthAnonymousEventPublisher.class, SessionKeyDecrytorHelper.class, ExternalRestHelperConfig.class, IdaRequestResponsConsumerUtil.class,
+		DecryptedPayloadLogService.class,
 		PartnerCACertEventServiceImpl.class, PartnerCACertEventInitializer.class, EnvUtil.class, KeyBindedTokenMatcherUtil.class,
 		HSMHealthCheck.class, TokenValidationHelper.class, VCSchemaProviderUtil.class, PrivateKeyDecryptorHelper.class, 
 		PasswordAuthServiceImpl.class, PasswordComparator.class, OndemandTemplateEventPublisher.class,
