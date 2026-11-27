@@ -196,8 +196,8 @@ public class DecryptedPayloadLogFilterTest {
 		assertEquals("200/SUCCESS", e.getResponseStatus());
 		assertEquals("/idauthentication/v1/auth/p/k", e.getEndpoint());
 		assertTrue(e.getDecryptedRequest().contains("\"transactionID\":\"t-1\""));
-		assertFalse("otp masked", e.getDecryptedRequest().contains("123456"));
-		assertTrue("individualId partially masked", e.getDecryptedRequest().contains("****3210"));
+		assertTrue("request is not masked", e.getDecryptedRequest().contains("123456"));
+		assertTrue("request is not masked", e.getDecryptedRequest().contains("9876543210"));
 		assertFalse(e.getDecryptedRequest().contains("ENCRYPTED"));
 		assertTrue(e.getDecryptedResponse().contains("\"authStatus\":true"));
 	}
@@ -254,7 +254,7 @@ public class DecryptedPayloadLogFilterTest {
 		assertEquals(1, saved.size());
 		DecryptedPayloadLogEntity e = saved.get(0);
 		assertTrue(e.getDecryptedRequest().contains("individualId"));
-		assertFalse(e.getDecryptedRequest().contains("123456"));
+		assertTrue(e.getDecryptedRequest().contains("123456"));
 		assertEquals("200/ERROR", e.getResponseStatus());
 	}
 

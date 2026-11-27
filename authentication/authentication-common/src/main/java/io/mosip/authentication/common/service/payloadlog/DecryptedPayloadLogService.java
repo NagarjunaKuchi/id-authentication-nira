@@ -30,8 +30,8 @@ import io.mosip.kernel.core.logger.spi.Logger;
 import io.mosip.kernel.core.util.DateUtils;
 
 /**
- * Persists the decrypted request and the plaintext response (the response
- * before it is signed) of API calls into ida.nira_decrypted_payload_log.
+ * Persists the decrypted request (stored unmasked, as decrypted) and the
+ * plaintext response (the response before it is signed; masked per config) of API calls into ida.nira_decrypted_payload_log.
  *
  * <p>
  * Controlled by <code>nira.logging.decrypted-payload.enabled</code> (default
@@ -194,7 +194,7 @@ public class DecryptedPayloadLogService {
 			entity.setId(ctx.getId());
 			entity.setEndpoint(ctx.getEndpoint());
 			entity.setHttpMethod(ctx.getHttpMethod());
-			entity.setDecryptedRequest(masker.mask(request));
+			entity.setDecryptedRequest(request); // stored exactly as decrypted: requests are not masked
 			entity.setDecryptedResponse(masker.mask(response));
 			entity.setResponseStatus(status);
 			entity.setErrorMessage(error);
