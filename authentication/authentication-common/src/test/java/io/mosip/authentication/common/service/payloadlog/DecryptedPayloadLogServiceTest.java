@@ -146,9 +146,9 @@ public class DecryptedPayloadLogServiceTest {
 		assertEquals(1, saved.size());
 	}
 
-	// 9. sensitive-field masking: responses are masked, requests are stored as decrypted
+	// 9. sensitive-field masking
 	@Test
-	public void requestIsStoredUnmaskedAndResponseIsMasked() {
+	public void sensitiveFieldsAreMaskedBeforePersisting() {
 		DecryptedPayloadLogService svc = service(true, Runnable::run);
 		DecryptedPayloadLogContext ctx = svc.begin(post("/auth"));
 		String request = "{\"individualId\":\"1234567890\",\"requestHMAC\":\"hmac\",\"request\":{\"otp\":\"123456\","
@@ -156,7 +156,13 @@ public class DecryptedPayloadLogServiceTest {
 		svc.captureDecryptedRequest(ctx, () -> request);
 		svc.complete(ctx, "{\"response\":{\"authStatus\":true,\"password\":\"p\"}}", 200,
 				DecryptedPayloadLogService.OUTCOME_SUCCESS, null);
-		assertEquals("request must be stored exactly as decrypted", request, saved.get(0).getDecryptedRequest());
+		String stored = saved.get(0).getDecryptedRequest();
+		assertFalse(stored.contains("SECRETBIO"));
+		assertFalse(stored.contains("123456\""));
+		assertFalse(stored.contains("\"hmac\""));
+		assertFalse(stored.contains("1234567890"));
+		assertTrue(stored.contains("****7890"));
+		assertTrue("non-sensitive data is kept", stored.contains("Jane"));
 		assertFalse(saved.get(0).getDecryptedResponse().contains("\"p\""));
 		assertTrue(saved.get(0).getDecryptedResponse().contains("\"authStatus\":true"));
 	}
