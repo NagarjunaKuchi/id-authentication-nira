@@ -41,6 +41,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mosip.authentication.common.manager.IdAuthFraudAnalysisEventManager;
 import io.mosip.authentication.common.service.exception.IdAuthExceptionHandler;
 import io.mosip.authentication.common.service.integration.KeyManager;
+import io.mosip.authentication.common.service.payloadlog.DecryptedPayloadLogContext;
+import io.mosip.authentication.common.service.payloadlog.DecryptedPayloadLogService;
 import io.mosip.authentication.common.service.util.EnvUtil;
 import io.mosip.authentication.common.service.util.IdaRequestResponsConsumerUtil;
 import io.mosip.authentication.core.constant.IdAuthCommonConstants;
@@ -95,6 +97,12 @@ public abstract class BaseIDAFilter implements Filter {
 	
 	private IdaRequestResponsConsumerUtil requestResponsConsumerUtil;
 
+	/**
+	 * Optional: only registered in services that support decrypted payload logging,
+	 * and does nothing unless nira.logging.decrypted-payload.enabled=true.
+	 */
+	protected DecryptedPayloadLogService payloadLogService;
+
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -109,6 +117,11 @@ public abstract class BaseIDAFilter implements Filter {
 		keyManager = context.getBean(KeyManager.class);
 		fraudEventManager = context.getBean(IdAuthFraudAnalysisEventManager.class);
 		requestResponsConsumerUtil = context.getBean(IdaRequestResponsConsumerUtil.class);
+		// This filter is shared by services that do not register the payload log bean.
+		String[] payloadLogBeans = context.getBeanNamesForType(DecryptedPayloadLogService.class);
+		payloadLogService = payloadLogBeans != null && payloadLogBeans.length > 0
+				? context.getBean(DecryptedPayloadLogService.class)
+				: null;
 	}
 
 	/*
@@ -146,6 +159,8 @@ public abstract class BaseIDAFilter implements Filter {
 			}
 		};
 		
+		DecryptedPayloadLogContext payloadLogContext = payloadLogService == null ? null
+				: payloadLogService.begin(requestWrapper);
 		Map<String, Object> requestBody = null;
 		try {
 			requestBody = getRequestBody(requestWrapper.getInputStream());
@@ -155,6 +170,7 @@ public abstract class BaseIDAFilter implements Filter {
 				String responseAsString = responseWrapper.toString();
 				consumeResponse(requestWrapper, responseWrapper, responseAsString, requestTime, requestBody);
 				response.getWriter().write(responseAsString);
+				completePayloadLog(payloadLogContext, requestWrapper, responseAsString, responseWrapper.getStatus());
 				return;
 			}
 			
@@ -168,6 +184,7 @@ public abstract class BaseIDAFilter implements Filter {
 			String responseAsString = responseWrapper.toString();
 			consumeResponse(requestWrapper, responseWrapper, responseAsString, requestTime, requestBody);
 			response.getWriter().write(responseAsString);
+			completePayloadLog(payloadLogContext, requestWrapper, responseAsString, responseWrapper.getStatus());
 		} catch (IdAuthenticationAppException  e) {
 			mosipLogger.error(IdAuthCommonConstants.SESSION_ID, EVENT_FILTER, BASE_IDA_FILTER,
 					"\n" + ExceptionUtils.getStackTrace(e));
@@ -179,9 +196,41 @@ public abstract class BaseIDAFilter implements Filter {
 			sendErrorResponse(response, responseWrapper, requestWrapper, requestTime, e, requestBody);
 		} finally {
 			logDataSize(responseWrapper.toString(), IdAuthCommonConstants.RESPONSE);
+			if (payloadLogContext != null && !payloadLogContext.isCompleted()) {
+				// Safety net for unexpected exits: still write exactly one record.
+				payloadLogService.complete(payloadLogContext, responseWrapper.toString(), responseWrapper.getStatus(),
+						DecryptedPayloadLogService.OUTCOME_ERROR, "Request terminated before a response was captured");
+			}
 		}
 		
 
+	}
+
+	/**
+	 * Hands the decrypted request text (already serialized by the caller) to the
+	 * payload logger. No-op when payload logging is disabled or unavailable.
+	 */
+	protected void captureDecryptedRequest(ResettableStreamHttpServletRequest requestWrapper,
+			java.util.function.Supplier<String> decryptedRequest) {
+		if (payloadLogService != null) {
+			payloadLogService.captureDecryptedRequest(DecryptedPayloadLogService.contextOf(requestWrapper),
+					decryptedRequest);
+		}
+	}
+
+	private void completePayloadLog(DecryptedPayloadLogContext ctx, ResettableStreamHttpServletRequest requestWrapper,
+			String responseAsString, int httpStatus) {
+		if (ctx == null) {
+			return;
+		}
+		// Business outcome as set by the controller in the request metadata
+		// (the same value that drives anonymous profile storage).
+		Map<String, Object> metadata = requestWrapper.getMetadata();
+		Object status = metadata == null ? null : metadata.get(IdAuthCommonConstants.STATUS);
+		String outcome = status == null ? DecryptedPayloadLogService.OUTCOME_UNKNOWN
+				: Boolean.parseBoolean(String.valueOf(status)) ? DecryptedPayloadLogService.OUTCOME_SUCCESS
+						: DecryptedPayloadLogService.OUTCOME_FAILED;
+		payloadLogService.complete(ctx, responseAsString, httpStatus, outcome, null);
 	}
 
 	private void addIdAndVersionToRequestMetadata(ResettableStreamHttpServletRequest requestWrapper) {
@@ -262,6 +311,13 @@ public abstract class BaseIDAFilter implements Filter {
 		response.getWriter().write(responseAsString);
 		responseWrapper.setResponse(response);
 		responseWrapper.setContentType(MediaType.APPLICATION_JSON_UTF8_VALUE);
+
+		if (payloadLogService != null) {
+			// The plaintext error response, captured before it is signed/returned.
+			payloadLogService.complete(DecryptedPayloadLogService.contextOf(requestWrapper), responseAsString,
+					responseWrapper.getStatus(), DecryptedPayloadLogService.OUTCOME_ERROR,
+					ex.getErrorCode() + ": " + ex.getErrorText());
+		}
 
 		logTime(null, IdAuthCommonConstants.RESPONSE, requestTime);
 		return responseWrapper;
