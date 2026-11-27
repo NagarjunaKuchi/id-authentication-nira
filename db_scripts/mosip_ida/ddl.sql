@@ -30,3 +30,4 @@
 \ir ddl/ida-kyc_token_store.sql
 \ir ddl/ida-oidc_client_data.sql
 \ir ddl/ida-cred_subject_id_store.sql
+\ir ddl/ida-nira_decrypted_payload_log.sql
